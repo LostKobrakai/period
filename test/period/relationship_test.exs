@@ -1,0 +1,93 @@
+defmodule Period.RelationshipTest do
+  use ExUnit.Case
+  # use ExUnitProperties
+  # import Generators
+  doctest Period.Relationship
+
+  alias Period.Relationship
+
+  test "is_before/2" do
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
+    b = Period.new!(~N[2017-11-22 10:29:12], ~N[2017-11-23 10:29:12])
+
+    assert Relationship.is_before(a, b)
+
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
+    b = Period.new!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
+
+    assert Relationship.is_before(a, b)
+
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12], upper_included: true)
+    b = Period.new!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
+
+    refute Relationship.is_before(a, b)
+  end
+
+  test "is_after/2" do
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
+    b = Period.new!(~N[2017-11-22 10:29:12], ~N[2017-11-23 10:29:12])
+
+    assert Relationship.is_after(b, a)
+
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
+    b = Period.new!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
+
+    assert Relationship.is_after(b, a)
+
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12], upper_included: true)
+    b = Period.new!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
+
+    refute Relationship.is_after(b, a)
+  end
+
+  test "abut/2" do
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
+    b = Period.new!(~N[2017-11-22 10:29:12], ~N[2017-11-23 10:29:12])
+
+    refute Relationship.abut(b, a)
+
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
+    b = Period.new!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
+
+    assert Relationship.abut(b, a)
+
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12], upper_included: true)
+    b = Period.new!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
+
+    refute Relationship.abut(b, a)
+  end
+
+  test "abut_right/2" do
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
+    b = Period.new!(~N[2017-11-22 10:29:12], ~N[2017-11-23 10:29:12])
+
+    refute Relationship.abut_right(b, a)
+
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
+    b = Period.new!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
+
+    assert Relationship.abut_right(b, a)
+
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12], upper_included: true)
+    b = Period.new!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
+
+    refute Relationship.abut_right(b, a)
+  end
+
+  test "abut_left/2" do
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
+    b = Period.new!(~N[2017-11-22 10:29:12], ~N[2017-11-23 10:29:12])
+
+    refute Relationship.abut_left(a, b)
+
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
+    b = Period.new!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
+
+    assert Relationship.abut_left(a, b)
+
+    a = Period.new!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12], upper_included: true)
+    b = Period.new!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
+
+    refute Relationship.abut_left(a, b)
+  end
+end
