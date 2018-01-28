@@ -1,122 +1,145 @@
 defmodule PeriodTest do
   use ExUnit.Case
   use ExUnitProperties
-  import Generators
+
   doctest Period
 
   describe "new/3" do
-
-    property "it does naivify both dates if one of the dates is naive" do
-      check all a <- datetime(),
-                b <- naive_datetime(),
-                switch <- boolean(),
-                :eq != NaiveDateTime.compare(a, b) do
-        [lower, upper] =
-          if switch do
-            [a, b]
-          else
-            [b, a]
-          end
-
-        assert {:ok, %{lower: %NaiveDateTime{}, upper: %NaiveDateTime{}}} = Period.new(lower, upper)
+    property "it can accept any positive timestamps in correct order" do
+      check all a <- positive_integer(),
+                b <- positive_integer(),
+                lower = a,
+                upper = a + b do
+        assert {:ok, %Period{}} = Period.new(lower, upper)
       end
     end
 
-    property "it keep a datetime duo" do
-      check all lower <- datetime(),
-                upper <- datetime(),
-                :eq != DateTime.compare(lower, upper) do
-        assert {:ok, %{lower: %DateTime{}, upper: %DateTime{}}} = Period.new(lower, upper)
+    property "it can accept any positive timestamps (even the same) for equal boundry setup" do
+      check all a <- positive_integer(),
+                b <- positive_integer(),
+                lower = min(a, b),
+                upper = max(a, b) do
+        both_included = [lower_state: :included, upper_state: :included]
+        assert {:ok, %Period{}} = Period.new(lower, upper, both_included)
+
+        both_excluded = [lower_state: :excluded, upper_state: :excluded]
+        assert {:ok, %Period{}} = Period.new(lower, upper, both_excluded)
       end
-    end
-
-    property "it does switch dates if the order doesn't work and strict mode is not enabled" do
-      check all a <- one_of([datetime(["Etc/UTC"]), naive_datetime()]),
-                b <- one_of([datetime(["Etc/UTC"]), naive_datetime()]),
-                :eq != NaiveDateTime.compare(a, b) do
-        {earlier, later} = sort_date(a, b)
-        {:ok, %{lower: returned_lower, upper: returned_upper}} = Period.new(later, earlier)
-
-        assert :eq == NaiveDateTime.compare(earlier, returned_lower)
-        assert :eq == NaiveDateTime.compare(later, returned_upper)
-      end
-    end
-
-    property "it does error for incorrectly ordered dates in strict mode" do
-      check all a <- one_of([datetime(), naive_datetime()]),
-                b <- one_of([datetime(), naive_datetime()]) do
-        {earlier, later} = sort_date(a, b)
-        {:error, _} = Period.new(later, earlier, strict: true)
-      end
-    end
-
-    test "it does compare boundries with timezones in mind if two datetimes are supplied" do
-      later = DateTime.utc_now()
-      earlier = %{later | utc_offset: 3600, std_offset: 0, time_zone: "Europe/Warsaw",  zone_abbr: "CET"}
-
-      {:ok, %{lower: ^earlier, upper: ^later}} = Period.new(earlier, later)
     end
 
     property "it does return an error for equal dates if one boundry is excluded and the other included" do
-      check all date <- one_of([datetime(), naive_datetime()]) do
-        assert {:error, _} = Period.new(date, date, lower_included: true, upper_included: false)
-        assert {:error, _} = Period.new(date, date, lower_included: false, upper_included: true)
-        assert {:ok, %Period{}} = Period.new(date, date, lower_included: true, upper_included: true)
-        assert {:ok, %Period{}} = Period.new(date, date, lower_included: false, upper_included: false)
+      check all timestamp <- positive_integer() do
+        lower_state = [lower_state: :included, upper_state: :excluded]
+        assert {:error, _} = Period.new(timestamp, timestamp, lower_state)
+
+        upper_state = [lower_state: :excluded, upper_state: :included]
+        assert {:error, _} = Period.new(timestamp, timestamp, upper_state)
       end
     end
-
   end
 
   describe "new!/3" do
+    property "it can accept any positive timestamps in correct order" do
+      check all a <- positive_integer(),
+                b <- positive_integer(),
+                lower = a,
+                upper = a + b do
+        assert %Period{} = Period.new!(lower, upper)
+      end
+    end
+
+    property "it can accept any positive timestamps (even the same) for equal boundry setup" do
+      check all a <- positive_integer(),
+                b <- positive_integer(),
+                lower = min(a, b),
+                upper = max(a, b) do
+        both_included = [lower_state: :included, upper_state: :included]
+        assert %Period{} = Period.new!(lower, upper, both_included)
+
+        both_excluded = [lower_state: :excluded, upper_state: :excluded]
+        assert %Period{} = Period.new!(lower, upper, both_excluded)
+      end
+    end
 
     property "it does raise for equal dates if one boundry is excluded and the other included" do
-      check all date <- one_of([datetime(), naive_datetime()]) do
-        assert %Period{} = Period.new!(date, date, lower_included: true, upper_included: true)
-        assert %Period{} = Period.new!(date, date, lower_included: false, upper_included: false)
+      check all timestamp <- positive_integer() do
+        lower_state = [lower_state: :included, upper_state: :excluded]
 
         assert_raise ArgumentError, fn ->
-          Period.new!(date, date, lower_included: true, upper_included: false)
+          Period.new!(timestamp, timestamp, lower_state)
         end
 
-        assert_raise ArgumentError, fn ->
-          Period.new!(date, date, lower_included: false, upper_included: true)
-        end
-      end
-    end
-
-    property "it does error for incorrectly ordered dates in strict mode" do
-      check all a <- one_of([datetime(), naive_datetime()]),
-                b <- one_of([datetime(), naive_datetime()]) do
-        {earlier, later} = sort_date(a, b)
+        upper_state = [lower_state: :excluded, upper_state: :included]
 
         assert_raise ArgumentError, fn ->
-          Period.new!(later, earlier)
+          Period.new!(timestamp, timestamp, upper_state)
         end
       end
     end
-
   end
 
-  property "it does return it's correct start date and boundry setting" do
-    check all a <- naive_datetime(),
-              b <- naive_datetime(),
-              lb <- boolean(),
-              ub <- boolean(),
-              lb == ub || :eq != NaiveDateTime.compare(a, b) do
-      {earlier, later} = sort_date(a, b)
+  describe "boundry retrieval" do
+    property "lower boundry" do
+      check all a <- positive_integer(),
+                b <- positive_integer(),
+                lower = a,
+                upper = a + b do
+        period = Period.new!(lower, upper, lower_state: :included)
+        assert {:included, dt} = Period.get_lower_boundry(period)
+        assert lower == DateTime.to_unix(dt, :microseconds)
+        assert "[" == Period.get_lower_boundry_notation(period)
 
-      {:ok, period} = Period.new(later, earlier, lower_included: lb, upper_included: ub)
+        period = Period.new!(lower, upper, lower_state: :excluded)
+        assert {:excluded, dt} = Period.get_lower_boundry(period)
+        assert lower == DateTime.to_unix(dt, :microseconds)
+        assert "(" == Period.get_lower_boundry_notation(period)
+      end
+    end
 
-      assert {^earlier, ^lb} = Period.get_lower_boundry(period)
-      assert {^later, ^ub} = Period.get_upper_boundry(period)
+    property "upper boundry" do
+      check all a <- positive_integer(),
+                b <- positive_integer(),
+                lower = a,
+                upper = a + b do
+        period = Period.new!(lower, upper, upper_state: :included)
+        assert {:included, dt} = Period.get_upper_boundry(period)
+        assert upper == DateTime.to_unix(dt, :microseconds)
+        assert "]" == Period.get_upper_boundry_notation(period)
+
+        period = Period.new!(lower, upper, upper_state: :excluded)
+        assert {:excluded, dt} = Period.get_upper_boundry(period)
+        assert upper == DateTime.to_unix(dt, :microseconds)
+        assert ")" == Period.get_upper_boundry_notation(period)
+      end
     end
   end
 
-  # property "relationship solver" do
-  #   check all a <- period(),
-  #             b <- period() do
-  #     IO.inspect {Period.Relationship.period_relationship(a, b), a, b}
-  #   end
-  # end
+  describe "make_inclusive/1" do
+    test "both exclusive" do
+      period = Period.new!(0, 2, lower_state: :excluded, upper_state: :excluded)
+      expect = Period.new!(1, 1, lower_state: :included, upper_state: :included)
+
+      assert expect == Period.make_inclusive(period)
+    end
+
+    test "lower exclusive" do
+      period = Period.new!(0, 1, lower_state: :excluded, upper_state: :included)
+      expect = Period.new!(1, 1, lower_state: :included, upper_state: :included)
+
+      assert expect == Period.make_inclusive(period)
+    end
+
+    test "upper exclusive" do
+      period = Period.new!(1, 2, lower_state: :included, upper_state: :excluded)
+      expect = Period.new!(1, 1, lower_state: :included, upper_state: :included)
+
+      assert expect == Period.make_inclusive(period)
+    end
+
+    test "none exclusive" do
+      period = Period.new!(1, 1, lower_state: :included, upper_state: :included)
+
+      assert period == Period.make_inclusive(period)
+    end
+  end
 end
