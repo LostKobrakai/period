@@ -1,23 +1,36 @@
 defmodule Period.Relationship do
   @moduledoc """
-  How do Periods stand in relation to each other
+  Does work with relationships between two `Period`'s.
   """
 
-  @doc """
-  Does create a new `%Period{}` struct.
+  @typep relationship ::
+           :same
+           | :contains
+           | :contained
+           | :before
+           | :after
+           | :insertsect_start
+           | :intersect_end
+           | :abut_left
+           | :abut_right
 
-  It does keep two `DateTime` structs as they are, but will naivify dates if one
-  of them is a `NaiveDateTime`.
+  @doc """
+  Determine if the first period is before the second one.
+
+  Being before the other period means having no overlap, but the periods might
+  directly abut each other.
 
   ## Examples
 
       iex> a = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
       iex> b = Period.from_naive!(~N[2017-11-22 14:32:21], ~N[2017-11-23 10:29:12])
-      iex> Period.Relationship.is_before(a, b)
+      iex> Period.Relationship.is_before?(a, b)
       true
 
   """
-  def is_before(%Period{} = a, %Period{} = b, opts \\ []) do
+  @spec is_before?(Period.t(), Period.t()) :: boolean
+  @spec is_before?(Period.t(), Period.t(), keyword) :: boolean
+  def is_before?(%Period{} = a, %Period{} = b, opts \\ []) do
     case period_relationship(a, b, opts) do
       :before -> true
       :abut_right -> true
@@ -26,20 +39,22 @@ defmodule Period.Relationship do
   end
 
   @doc """
-  Does create a new `%Period{}` struct.
+  Determine if the first period is after the second one.
 
-  It does keep two `DateTime` structs as they are, but will naivify dates if one
-  of them is a `NaiveDateTime`.
+  Being after the other period means having no overlap, but the periods might
+  directly abut each other.
 
   ## Examples
 
       iex> a = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
       iex> b = Period.from_naive!(~N[2017-11-22 14:32:21], ~N[2017-11-23 10:29:12])
-      iex> Period.Relationship.is_after(b, a)
+      iex> Period.Relationship.is_after?(b, a)
       true
 
   """
-  def is_after(%Period{} = a, %Period{} = b, opts \\ []) do
+  @spec is_after?(Period.t(), Period.t()) :: boolean
+  @spec is_after?(Period.t(), Period.t(), keyword) :: boolean
+  def is_after?(%Period{} = a, %Period{} = b, opts \\ []) do
     case period_relationship(a, b, opts) do
       :after -> true
       :abut_left -> true
@@ -48,74 +63,127 @@ defmodule Period.Relationship do
   end
 
   @doc """
-  Does create a new `%Period{}` struct.
+  Determine if the periods abut each other.
 
-  It does keep two `DateTime` structs as they are, but will naivify dates if one
-  of them is a `NaiveDateTime`.
+  Being about means having no overlap, but having no gap:
+
+  ### End exclusive - Start inclusive
+
+  ```markdown
+  … . . .)
+       [. . . …
+  ```
+
+  ### End inclusive - Start exclusive
+
+  ```markdown
+  … . . .]
+       (. . . …
+  ```
+
+  ### Both inclusive
+
+  ```markdown
+  … . .]
+       [. . . …
+  ```
 
   ## Examples
 
       iex> a = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
       iex> b = Period.from_naive!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
-      iex> Period.Relationship.abut(a, b) && Period.Relationship.abut(b, a)
+      iex> Period.Relationship.abut?(a, b) && Period.Relationship.abut?(b, a)
       true
 
   """
-  def abut(%Period{} = a, %Period{} = b, opts \\ []) do
-    abut_left(a, b, opts) || abut_right(a, b, opts)
+  @spec abut?(Period.t(), Period.t()) :: boolean
+  @spec abut?(Period.t(), Period.t(), keyword) :: boolean
+  def abut?(%Period{} = a, %Period{} = b, opts \\ []) do
+    is_abutted_left?(a, b, opts) || is_abutted_right?(a, b, opts)
   end
 
   @doc """
-  Does create a new `%Period{}` struct.
+  Determine if the first period is abutted on it's left side by the second period.
 
-  It does keep two `DateTime` structs as they are, but will naivify dates if one
-  of them is a `NaiveDateTime`.
+  For details on what `abut` means, see: `abut?/3`.
 
   ## Examples
 
       iex> a = Period.from_naive!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
       iex> b = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
-      iex> Period.Relationship.abut_left(a, b)
+      iex> Period.Relationship.is_abutted_left?(a, b)
       true
 
   """
-  def abut_left(%Period{} = a, %Period{} = b, opts \\ []) do
+  @spec is_abutted_left?(Period.t(), Period.t()) :: boolean
+  @spec is_abutted_left?(Period.t(), Period.t(), keyword) :: boolean
+  def is_abutted_left?(%Period{} = a, %Period{} = b, opts \\ []) do
     :abut_left == period_relationship(a, b, opts)
   end
 
   @doc """
-  Does create a new `%Period{}` struct.
+  Determine if the first period is abutted on it's right side by the second period.
 
-  It does keep two `DateTime` structs as they are, but will naivify dates if one
-  of them is a `NaiveDateTime`.
+  For details on what `abut` means, see: `abut?/3`.
 
   ## Examples
 
       iex> a = Period.from_naive!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
       iex> b = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-21 10:29:12])
-      iex> Period.Relationship.abut_right(b, a)
+      iex> Period.Relationship.is_abutted_right?(b, a)
       true
 
   """
-  def abut_right(%Period{} = a, %Period{} = b, opts \\ []) do
+  @spec is_abutted_right?(Period.t(), Period.t()) :: boolean
+  @spec is_abutted_right?(Period.t(), Period.t(), keyword) :: boolean
+  def is_abutted_right?(%Period{} = a, %Period{} = b, opts \\ []) do
     :abut_right == period_relationship(a, b, opts)
   end
 
   @doc """
-  Does create a new `%Period{}` struct.
+  Determine if the first period overlaps the second one.
 
-  It does keep two `DateTime` structs as they are, but will naivify dates if one
-  of them is a `NaiveDateTime`.
+  Overlaping means having being at least one common point:
+
+  ### End exclusive - Start inclusive
+
+  ```markdown
+  … . . .)
+     [. . . . …
+  ```
+
+  ### End inclusive - Start exclusive
+
+  ```markdown
+  … . . .]
+     (. . . . …
+  ```
+
+  ### Both inclusive
+
+  ```markdown
+  … . .]
+     [. . . . …
+  ```
+
+  ### Both exclusive
+
+  ```markdown
+  … . . . .)
+     (. . . . …
+  ```
 
   ## Examples
 
       iex> a = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21])
       iex> b = Period.from_naive!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
-      iex> Period.Relationship.overlaps(a, b)
+      iex> Period.Relationship.overlaps?(a, b)
       true
 
   """
-  def overlaps(%Period{} = a, %Period{} = b, opts \\ []) do
+  @spec overlaps?(Period.t(), Period.t()) :: boolean
+  @spec overlaps?(Period.t(), Period.t(), keyword) :: boolean
+  def overlaps?(%Period{} = a, %Period{} = b, opts \\ []) do
     case period_relationship(a, b, opts) do
       :intersect_start -> true
       :intersect_end -> true
@@ -126,57 +194,151 @@ defmodule Period.Relationship do
   end
 
   @doc """
-  Does create a new `%Period{}` struct.
+  Determine if the first period contains the second one.
 
-  It does keep two `DateTime` structs as they are, but will naivify dates if one
-  of them is a `NaiveDateTime`.
+  Containment means having being at least the same period as the second one, but
+  overlaping it on at least one side:
 
-  ## Examples
+  ### Overlap both ends
 
-      iex> a = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21])
-      iex> b = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21])
-      iex> Period.Relationship.same_value(a, b)
-      true
+  ```markdown
+  [. . . . . . .]
+    [. . . . .]
+  ```
 
-  """
-  def same_value(%Period{} = a, %Period{} = b, opts \\ []) do
-    :same == period_relationship(a, b, opts)
-  end
+  ### Overlap start
 
-  @doc """
-  Does create a new `%Period{}` struct.
+  ```markdown
+  [. . . . . . .]
+    [. . . . . .]
+  ```
 
-  It does keep two `DateTime` structs as they are, but will naivify dates if one
-  of them is a `NaiveDateTime`.
+  ### Overlap end
+
+  ```markdown
+  [. . . . . . .]
+  [. . . . . .]
+  ```
 
   ## Examples
 
       iex> a = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21])
       iex> b = Period.from_naive!(~N[2017-11-20 18:32:21], ~N[2017-11-22 07:32:21])
-      iex> Period.Relationship.contains(a, b)
+      iex> Period.Relationship.contains?(a, b)
       true
 
   """
-  def contains(%Period{} = a, %Period{} = b, opts \\ []) do
+  @spec contains?(Period.t(), Period.t()) :: boolean
+  @spec contains?(Period.t(), Period.t(), keyword) :: boolean
+  def contains?(%Period{} = a, %Period{} = b, opts \\ []) do
     :contains == period_relationship(a, b, opts)
   end
 
   @doc """
-  Does create a new `%Period{}` struct.
+  Determine if the first period is contained by the second one.
 
-  It does keep two `DateTime` structs as they are, but will naivify dates if one
-  of them is a `NaiveDateTime`.
+  For details on what `contained` means, see: `contains?/3`.
+
+  ```
+
+  ## Examples
+
+      iex> a = Period.from_naive!(~N[2017-11-20 18:32:21], ~N[2017-11-22 07:32:21])
+      iex> b = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21])
+      iex> Period.Relationship.is_contained_by?(a, b)
+      true
+
+  """
+  @spec is_contained_by?(Period.t(), Period.t()) :: boolean
+  @spec is_contained_by?(Period.t(), Period.t(), keyword) :: boolean
+  def is_contained_by?(%Period{} = a, %Period{} = b, opts \\ []) do
+    contains?(b, a, opts)
+  end
+
+  @doc """
+  Determine if both periods span the same time.
+
+  ## Non-strict comparison
+
+  ### Simple
+
+  ```markdown
+  [. . . . .]
+  [. . . . .]
+  ```
+
+  ### Exclusive overlap start
+
+  ```markdown
+  (. . . . . . .]
+    [. . . . . .]
+  ```
+
+  ### Exclusive overlap end
+
+  ```markdown
+  [. . . . . . .)
+  [. . . . . .]
+  ```
+
+  ## Strict comparison
+
+  For strict comparison timespan and boundry states need to be the same.
+
+  ## Examples
+
+      iex> a = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21])
+      iex> b = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21])
+      iex> Period.Relationship.same?(a, b)
+      true
+
+      iex> a = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21])
+      iex> b = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21])
+      iex> Period.Relationship.same?(a, b, strict: true)
+      true
+
+      iex> a = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21.000001])
+      iex> b = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21], upper_state: :included)
+      iex> Period.Relationship.same?(a, b)
+      true
+
+      iex> a = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21.000001])
+      iex> b = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21], upper_state: :included)
+      iex> Period.Relationship.same?(a, b, strict: true)
+      false
+
+  """
+  @spec same?(Period.t(), Period.t()) :: boolean
+  @spec same?(Period.t(), Period.t(), keyword) :: boolean
+  def same?(%Period{} = a, %Period{} = b, opts \\ []) do
+    with :same <- period_relationship(a, b, opts) do
+      if Keyword.get(opts, :strict, false) do
+        Period.get_boundry_notation(a) == Period.get_boundry_notation(b)
+      else
+        true
+      end
+    else
+      _ -> false
+    end
+  end
+
+  @doc """
+  If both periods overlap returns a new period of the intersection of both.
+
+  For details on what `overlapping` means, see: `overlaps?/3`.
 
   ## Examples
 
       iex> a = Period.from_naive!(~N[2017-11-20 14:32:21], ~N[2017-11-22 14:32:21])
       iex> b = Period.from_naive!(~N[2017-11-21 10:29:12], ~N[2017-11-23 10:29:12])
-      iex> {:ok, period} = Period.Relationship.intersect(a, b)
+      iex> {:ok, period} = Period.Relationship.intersection(a, b)
       iex> period
       #Period<[#DateTime<2017-11-21 10:29:12.000000Z>, #DateTime<2017-11-22 14:32:21.000000Z>)>
 
   """
-  def intersect(%Period{} = a, %Period{} = b, opts \\ []) do
+  @spec intersection(Period.t(), Period.t()) :: {:ok, Period.t()} | {:error, binary}
+  @spec intersection(Period.t(), Period.t(), keyword) :: {:ok, Period.t()} | {:error, binary}
+  def intersection(%Period{} = a, %Period{} = b, opts \\ []) do
     case period_relationship(a, b, opts) do
       :intersect_start ->
         opts = [
@@ -206,10 +368,9 @@ defmodule Period.Relationship do
   end
 
   @doc """
-  Does create a new `%Period{}` struct.
+  If both periods do not overlap or abut it returns a new period of the gap between both.
 
-  It does keep two `DateTime` structs as they are, but will naivify dates if one
-  of them is a `NaiveDateTime`.
+  For details on what `overlapping` means, see: `overlaps?/3`. For details on what `abut` means, see: `abut?/3`.
 
   ## Examples
 
@@ -221,10 +382,12 @@ defmodule Period.Relationship do
       #Period<[#DateTime<2017-11-21 10:29:12.000000Z>, #DateTime<2017-11-22 14:32:21.000000Z>)>
 
   """
+  @spec gap(Period.t(), Period.t()) :: {:ok, Period.t()} | {:error, binary}
+  @spec gap(Period.t(), Period.t(), keyword) :: {:ok, Period.t()} | {:error, binary}
   def gap(%Period{} = a, %Period{} = b, opts \\ []) do
-    with false <- overlaps(a, b, opts),
-         false <- abut(a, b, opts) do
-      [a, b] = Enum.sort([a, b], &is_before/2)
+    with false <- overlaps?(a, b, opts),
+         false <- abut?(a, b, opts) do
+      [a, b] = Enum.sort([a, b], &is_before?/2)
 
       opts = [
         lower_state: invert_inclusion(a.upper_state),
@@ -237,25 +400,12 @@ defmodule Period.Relationship do
     end
   end
 
+  @spec invert_inclusion(Period.boundry_state()) :: Period.boundry_state()
   defp invert_inclusion(:included), do: :excluded
   defp invert_inclusion(:excluded), do: :included
 
-  @type relationship ::
-          :same
-          | :contains
-          | :contained
-          | :before
-          | :after
-          | :insertsect_start
-          | :intersect_end
-          | :abut_left
-          | :abut_right
-
-  @doc """
-  Low level relationship between periods
-  """
   @spec period_relationship(Period.t(), Period.t(), Keyword.t()) :: relationship
-  def period_relationship(%Period{} = a, %Period{} = b, _opts \\ []) do
+  defp period_relationship(%Period{} = a, %Period{} = b, _opts) do
     a = Period.make_inclusive(a)
     b = Period.make_inclusive(b)
 

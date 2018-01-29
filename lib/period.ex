@@ -1,6 +1,21 @@
 defmodule Period do
   @moduledoc """
-  Documentation for Period.
+  Period does represent a timeframe.
+
+  ## Creating a Period
+
+  A Period is a opaque type, so it's not meant to be directly created like
+  other structs, but you should rather use `Period.new/3`, `Period.new!/3` or
+  `Period.from_naive/3` to create a Period.
+
+  Internally Period's do work with timestamps (`:microsecond` precision) so
+  any DateTime values extracted from a Period will be using the default `Etc/UTC`
+  timezone. The caller will be responsible to retain timezones if needed.
+
+  ## Date.Range
+
+  A Period can be converted into a elixir core `Date.Range` struct by using
+  `Period.to_range/1`.
   """
   @enforce_keys [:lower, :upper, :lower_state, :upper_state]
   defstruct lower: nil,
@@ -130,6 +145,14 @@ defmodule Period do
   Get the lower boundry of the period.
 
   Does return the boundry state and the date of the boundry.
+
+  ## Example
+
+      iex> period = Period.new!(1517171882222330, 1517171882222335)
+      iex> {:included, dt} = Period.get_lower_boundry(period)
+      iex> dt
+      #DateTime<2018-01-28 20:38:02.222330Z>
+
   """
   @spec get_lower_boundry(t) :: {boundry_state, DateTime.t()}
   def get_lower_boundry(%Period{lower: lower, lower_state: lb}) do
@@ -140,6 +163,14 @@ defmodule Period do
   Get the lower boundry of the period.
 
   Does return the boundry state and the date of the boundry.
+
+  ## Example
+
+      iex> period = Period.new!(1517171882222330, 1517171882222335)
+      iex> {:excluded, dt} = Period.get_upper_boundry(period)
+      iex> dt
+      #DateTime<2018-01-28 20:38:02.222335Z>
+
   """
   @spec get_upper_boundry(t) :: {boundry_state, DateTime.t()}
   def get_upper_boundry(%Period{upper: upper, upper_state: ub}) do
@@ -148,6 +179,13 @@ defmodule Period do
 
   @doc """
   Get the boundry notation for both boundries
+
+  ## Example
+
+      iex> period = Period.new!(1517171882222330, 1517171882222335)
+      iex> Period.get_boundry_notation(period)
+      {"[", ")"}
+
   """
   @spec get_boundry_notation(t) :: {binary(), binary()}
   def get_boundry_notation(%Period{} = p) do
@@ -156,6 +194,17 @@ defmodule Period do
 
   @doc """
   Get the boundry notation for the lower boundry
+
+  ## Example
+
+      iex> period = Period.new!(1517171882222330, 1517171882222335)
+      iex> Period.get_lower_boundry_notation(period)
+      "["
+
+      iex> period = Period.new!(1517171882222330, 1517171882222335, lower_state: :excluded)
+      iex> Period.get_lower_boundry_notation(period)
+      "("
+
   """
   @spec get_lower_boundry_notation(t) :: binary()
   def get_lower_boundry_notation(%Period{lower_state: :included}), do: "["
@@ -163,13 +212,31 @@ defmodule Period do
 
   @doc """
   Get the boundry notation for the upper boundry
+
+  ## Example
+
+      iex> period = Period.new!(1517171882222330, 1517171882222335)
+      iex> Period.get_upper_boundry_notation(period)
+      ")"
+
+      iex> period = Period.new!(1517171882222330, 1517171882222335, upper_state: :included)
+      iex> Period.get_upper_boundry_notation(period)
+      "]"
+
   """
   @spec get_upper_boundry_notation(t) :: binary()
   def get_upper_boundry_notation(%Period{upper_state: :included}), do: "]"
   def get_upper_boundry_notation(%Period{upper_state: :excluded}), do: ")"
 
   @doc """
-  Make a period inclusive on both ends
+  Make a period inclusive on both ends.
+
+  ## Example
+
+      iex> period = Period.new!(1517171882222330, 1517171882222335)
+      iex> Period.make_inclusive(period)
+      #Period<[#DateTime<2018-01-28 20:38:02.222330Z>, #DateTime<2018-01-28 20:38:02.222334Z>]>
+
   """
   @spec make_inclusive(t) :: t
   def make_inclusive(%Period{lower: lower, lower_state: :excluded} = period) do
@@ -189,8 +256,8 @@ defmodule Period do
   @doc """
   Convert the period into a core `%Date.Range{}`.
 
-  Does only work for fully inclusive periods because of the same restriction
-  for `Date.Range` structs.
+  Does only work with periods, which are inclusive on both boundries as that's a restriction
+  of `Date.Range` structs.
   """
   @spec to_range(t) :: {:ok, Date.Range.t()} | {:error, term}
   def to_range(%Period{lower: lower, upper: upper, lower_state: true, upper_state: true}) do
