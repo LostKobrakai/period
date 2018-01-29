@@ -1,2 +1,0 @@
-- Make abut accept a tolerance level (:second, :minute)
-- Make Period.Relationships work only with Period interface functions
